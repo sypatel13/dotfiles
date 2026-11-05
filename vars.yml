@@ -48,13 +48,5 @@ dotfiles_config_paths:
   - .tmux.conf.local
   - .config/ghostty/config
   - .config/ghostty/themes/dracula
-
-dotfiles_git_settings:
-  - name: core.pager
-    value: delta
-  - name: interactive.diffFilter
-    value: delta --color-only
-  - name: delta.side-by-side
-    value: "true"
-  - name: delta.line-numbers
-    value: "true"
+  - .gitconfig
+  - .gitignore_global

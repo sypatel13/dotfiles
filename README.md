@@ -21,9 +21,11 @@ requests sudo only for its system package and APT repository tasks.
   the shared config. Existing native settings are backed up.
 - Docker plugin links for `docker compose` and `docker buildx`. It does not edit
   Docker credentials or contexts.
-- Git's delta pager and side-by-side, line-numbered diffs. It changes only the
-  four settings listed in [vars.yml](vars.yml), not your identity or credentials.
-  It does not deploy the repository's older [.gitconfig](.gitconfig).
+- Symlinks for [.gitconfig](.gitconfig) and [.gitignore_global](.gitignore_global).
+  The linked Git config sets your identity, credential cache, global ignore
+  file, and delta pager. An existing `~/.gitconfig` is backed up, not merged.
+  Later `git config --global` writes, including `gh auth setup-git`, change
+  the repository file.
 
 It does not install Docker Desktop, Ghostty, VS Code, VS Code extensions,
 Obsidian, or the Copilot desktop app. Obsidian's CLI and Desktop-only Docker
@@ -133,8 +135,8 @@ The installed clients alone cannot run containers.
 ## Ubuntu setup
 
 [ubuntu.yml](ubuntu.yml) supports Ubuntu 26.04 on amd64 and arm64. It shares
-the shell framework pins, configuration links, backups, and selective Git
-settings with the MacBook playbook through [vars.yml](vars.yml) and
+the shell framework pins, configuration and Git links, and backups with the
+MacBook playbook through [vars.yml](vars.yml) and
 [tasks/terminal.yml](tasks/terminal.yml).
 
 [vars.ubuntu.yml](vars.ubuntu.yml) defines the Ubuntu packages and release pins:
