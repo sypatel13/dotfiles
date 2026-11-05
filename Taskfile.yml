@@ -12,10 +12,16 @@ tasks:
       - task --list
 
   setup:
-    desc: Install locked Python dependencies and pinned Ansible collections
+    desc: Check out submodules, then install locked Python dependencies and pinned Ansible collections
     cmds:
+      - task: submodules
       - task: sync
       - task: collections
+
+  submodules:
+    desc: Check out the pinned Oh my tmux! submodule
+    cmds:
+      - git submodule update --init
 
   sync:
     desc: Sync the project virtual environment from uv.lock

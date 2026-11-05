@@ -30,6 +30,12 @@
           amd64 or arm64 user, without sudo or --become. Only package tasks
           request sudo. Keep this repository in its own directory.
 
+    - name: Require the Oh my tmux! submodule
+      ansible.builtin.assert:
+        that:
+          - (playbook_dir ~ '/vendor/oh-my-tmux/.tmux.conf') is file
+        fail_msg: Run `mise exec -- task setup` to check out the Oh my tmux! submodule.
+
     - name: Inspect the system mise executable
       ansible.builtin.stat:
         path: /usr/bin/mise

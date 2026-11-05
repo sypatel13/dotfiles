@@ -16,7 +16,8 @@ requests sudo only for its system package and APT repository tasks.
 - The Copilot CLI and Task casks, plus SauceCodePro Nerd Font.
 - Oh My Zsh, Powerlevel10k, and Deja's Oh My Zsh plugin at pinned Git commits.
   Oh My Zsh automatic updates are disabled so it stays at the managed revision.
-- Symlinks for Zsh, Powerlevel10k, the existing Oh my tmux! snapshots, and Ghostty.
+- Symlinks for Zsh, Powerlevel10k, Oh my tmux!, and Ghostty. See
+  [Oh my tmux!](#oh-my-tmux) for how the tmux files are split.
   A comment-only native Ghostty config prevents that location from overriding
   the shared config. Existing native settings are backed up.
 - Docker plugin links for `docker compose` and `docker buildx`. It does not edit
@@ -82,7 +83,8 @@ Python packages, so uv cannot install them. `task collections` uses
 `ansible-galaxy` from the uv environment and installs into `.ansible/collections`.
 Task sets the collection path for every Ansible command.
 
-`task setup` runs Python synchronization before collection installation.
+`task setup` checks out the Oh my tmux! submodule, then runs Python
+synchronization before collection installation.
 Other tasks do not install dependencies or silently update the lockfile.
 Before any Ansible command, a shared prerequisite runs
 `uv sync --check --locked --offline`. It refuses an outdated lockfile or
@@ -270,6 +272,30 @@ after a backup, that backup remains available for recovery.
 
 The backup mechanism covers replaced links and files. Selective Git settings
 are managed in place rather than replacing or backing up the whole Git config.
+
+## Oh my tmux!
+
+[.tmux.conf](.tmux.conf) is a symlink to the upstream file in the
+[vendor/oh-my-tmux](vendor/oh-my-tmux) submodule, so `~/.tmux.conf` resolves
+to the pinned upstream commit. Don't edit that file. Put tmux settings in
+[.tmux.conf.local](.tmux.conf.local), which starts from the upstream template
+and adds two changes: Powerline separators, and `|` instead of `_` for
+`split-window -h`.
+
+To update upstream, review its changes, then commit the new submodule commit:
+
+```sh
+git -C vendor/oh-my-tmux fetch origin
+git -C vendor/oh-my-tmux log --oneline HEAD..origin/master
+git -C vendor/oh-my-tmux checkout origin/master
+git diff --submodule=diff
+git add vendor/oh-my-tmux
+```
+
+If the diff changes `vendor/oh-my-tmux/.tmux.conf.local`, copy any new
+settings you want into [.tmux.conf.local](.tmux.conf.local). Running tmux
+servers keep their loaded configuration until you press `prefix r` or
+start a new server.
 
 ## Validation
 

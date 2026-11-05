@@ -29,6 +29,12 @@
           without sudo or become. Keep this repository in its own directory.
           Only standard Apple Silicon and Intel Homebrew prefixes are supported.
 
+    - name: Require the Oh my tmux! submodule
+      ansible.builtin.assert:
+        that:
+          - (playbook_dir ~ '/vendor/oh-my-tmux/.tmux.conf') is file
+        fail_msg: Run `mise exec -- task setup` to check out the Oh my tmux! submodule.
+
     - name: Inspect the Homebrew executable
       ansible.builtin.stat:
         path: "{{ dotfiles_homebrew_prefix }}/bin/brew"

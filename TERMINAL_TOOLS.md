@@ -208,13 +208,17 @@ with the Ansible setup changes noted below:
 | [.zshrc](.zshrc) | `~/.zshrc` | Oh My Zsh plugins, Powerlevel10k loading, history, key bindings, fzf, and mise activation |
 | [.zprofile](.zprofile) | `~/.zprofile` | Docker CLI PATH and Homebrew initialization |
 | [.p10k.zsh](.p10k.zsh) | `~/.p10k.zsh` | Generated Powerlevel10k prompt with customized Dracula colors |
-| [.tmux.conf](.tmux.conf) | `~/.tmux.conf` | Oh my tmux! base configuration |
-| [.tmux.conf.local](.tmux.conf.local) | `~/.tmux.conf.local` | Local tmux settings |
+| [.tmux.conf](.tmux.conf) | `~/.tmux.conf` | Symlink to Oh my tmux! in the [vendor/oh-my-tmux](vendor/oh-my-tmux) submodule |
+| [.tmux.conf.local](.tmux.conf.local) | `~/.tmux.conf.local` | Local tmux settings: Powerline separators, and `\|` instead of `_` for `split-window -h` |
 | [Ghostty config](.config/ghostty/config) | `~/.config/ghostty/config` | Font family, size 14, and Dracula theme selection |
 | [Ghostty Dracula theme](.config/ghostty/themes/dracula) | `~/.config/ghostty/themes/dracula` | Custom palette and terminal colors |
 | [Ghostty native config](.config/ghostty/config.ghostty) | `~/Library/Application Support/com.mitchellh.ghostty/config.ghostty` | Comment-only file that leaves settings in the shared config |
 
-Both tmux files already matched the live configuration and were left unchanged.
+On 2026-11-05, Oh my tmux! moved from a 2018 copy to a submodule pinned to
+upstream commit `58a3dcc`. The 2018 copy had changed `_` to `|` directly in
+`.tmux.conf`. [.tmux.conf.local](.tmux.conf.local) was rebuilt from the
+current upstream template, and that binding moved there with the Powerline
+separators.
 The Zsh files use `$HOME`, detect Homebrew at its standard Apple Silicon or
 Intel prefix, and activate Homebrew's mise. Deja key bindings are configured
 before its plugin loads, and syntax highlighting loads last. Oh My Zsh
@@ -226,7 +230,9 @@ macOS-specific Ghostty settings are consolidated into this one repository file.
 
 The copied templates retain their upstream licenses:
 [Oh My Zsh](licenses/oh-my-zsh-MIT.txt) and
-[Powerlevel10k](licenses/powerlevel10k-MIT.txt).
+[Powerlevel10k](licenses/powerlevel10k-MIT.txt). Oh my tmux! keeps its
+[MIT](vendor/oh-my-tmux/LICENSE.MIT) and
+[WTFPL](vendor/oh-my-tmux/LICENSE.WTFPLv2) licenses in its submodule.
 
 ### Source Code Pro Nerd Font
 
@@ -258,6 +264,8 @@ standalone mise executable. Install the font described above before using the
 Ghostty config.
 
 Back up existing files, then run these commands from the repository root.
+`.tmux.conf` is a symlink into the Oh my tmux! submodule, so run
+`git submodule update --init` first; `cp` copies the symlink's target.
 `cp -i` prompts before overwriting an existing file:
 
 ```sh
