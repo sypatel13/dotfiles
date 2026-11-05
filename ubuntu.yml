@@ -48,6 +48,16 @@
           install mise and python3-apt before running this playbook.
 
   tasks:
+    - name: Explain prerequisite-dependent checks
+      ansible.builtin.debug:
+        msg: >-
+          Check mode does not create prerequisite directories or download files.
+          Downloads are deferred when their destination directory is missing.
+          Extraction is deferred when its directory is missing or its download
+          is deferred or would change. npm package checks are deferred when
+          /usr/bin/npm is missing. Run ubuntu:apply to create these prerequisites.
+      when: ansible_check_mode
+
     - name: Install system packages and Docker clients
       become: true
       block:
@@ -67,6 +77,15 @@
             state: directory
             mode: "0755"
 
+        - name: Inspect the APT keyring directory in check mode
+          ansible.builtin.stat:
+            path: /etc/apt/keyrings
+            follow: true
+            get_checksum: false
+            get_mime: false
+          register: dotfiles_docker_keyring
+          when: ansible_check_mode
+
         - name: Install the verified Docker repository signing key
           ansible.builtin.get_url:
             url: https://download.docker.com/linux/ubuntu/gpg
@@ -74,6 +93,7 @@
             checksum: "sha256:1500c1f56fa9e26b9b8f42452a553675796ade0807cdce11975eb98170b3a570"
             mode: "0644"
           register: dotfiles_docker_key
+          when: not ansible_check_mode or dotfiles_docker_keyring.stat.exists
 
         - name: Configure the signed Docker repository for Ubuntu 26.04
           ansible.builtin.copy:
@@ -89,6 +109,20 @@
             backup: true
           register: dotfiles_docker_source
 
+        - name: Explain deferred Docker package checks
+          ansible.builtin.debug:
+            msg: >-
+              Docker package checks are deferred because the signing key or
+              repository would change. Check mode cannot configure the repository
+              or refresh its package index. Run ubuntu:apply to install the clients,
+              then rerun ubuntu:plan to check them.
+          when:
+            - ansible_check_mode
+            - >-
+              dotfiles_docker_key is skipped
+              or dotfiles_docker_key is changed
+              or dotfiles_docker_source is changed
+
         - name: Install standalone Docker clients without a daemon
           ansible.builtin.apt:
             name:
@@ -102,12 +136,26 @@
             auto_install_module_deps: false
             force_apt_get: true
             fail_on_autoremove: true
+          when: >-
+            not ansible_check_mode
+            or not (dotfiles_docker_key is skipped
+                    or dotfiles_docker_key is changed
+                    or dotfiles_docker_source is changed)
 
     - name: Create the private download cache
       ansible.builtin.file:
         path: "{{ dotfiles_ubuntu_cache }}"
         state: directory
         mode: "0700"
+
+    - name: Inspect the download cache in check mode
+      ansible.builtin.stat:
+        path: "{{ dotfiles_ubuntu_cache }}"
+        follow: true
+        get_checksum: false
+        get_mime: false
+      register: dotfiles_download_cache
+      when: ansible_check_mode
 
     - name: Install pinned user-local CLI archives
       ansible.builtin.include_tasks: tasks/ubuntu-cli-archive.yml
@@ -122,6 +170,15 @@
         state: directory
         mode: "0755"
 
+    - name: Inspect the kubectl directory in check mode
+      ansible.builtin.stat:
+        path: "{{ dotfiles_ubuntu_tools }}/kubectl-{{ dotfiles_ubuntu_kubectl_version }}"
+        follow: true
+        get_checksum: false
+        get_mime: false
+      register: dotfiles_kubectl_directory
+      when: ansible_check_mode
+
     - name: Install the verified kubectl binary
       ansible.builtin.get_url:
         url: >-
@@ -129,6 +186,7 @@
         dest: "{{ dotfiles_ubuntu_tools }}/kubectl-{{ dotfiles_ubuntu_kubectl_version }}/kubectl"
         checksum: "{{ dotfiles_ubuntu_kubectl_checksums[dotfiles_ubuntu_architecture] }}"
         mode: "0755"
+      when: not ansible_check_mode or dotfiles_kubectl_directory.stat.exists
 
     - name: Link kubectl without discarding an existing user-local command
       ansible.builtin.include_tasks: tasks/symlink.yml
@@ -136,6 +194,15 @@
         dotfiles_link:
           src: "{{ dotfiles_ubuntu_tools }}/kubectl-{{ dotfiles_ubuntu_kubectl_version }}/kubectl"
           dest: "{{ dotfiles_home }}/.local/bin/kubectl"
+
+    - name: Inspect the system npm executable in check mode
+      ansible.builtin.stat:
+        path: /usr/bin/npm
+        follow: true
+        get_checksum: false
+        get_mime: false
+      register: dotfiles_ubuntu_npm
+      when: ansible_check_mode
 
     - name: Install pinned npm CLIs in a dedicated user-owned prefix
       community.general.npm:
@@ -150,6 +217,7 @@
       environment:
         PATH: /usr/bin:/bin
         npm_config_prefix: "{{ dotfiles_ubuntu_tools }}/npm"
+      when: not ansible_check_mode or dotfiles_ubuntu_npm.stat.exists
 
     - name: Link npm CLIs without discarding existing user-local commands
       ansible.builtin.include_tasks: tasks/symlink.yml
@@ -167,12 +235,23 @@
         dest: "{{ dotfiles_ubuntu_cache }}/SourceCodePro-{{ dotfiles_ubuntu_font_version }}.tar.xz"
         checksum: "{{ dotfiles_ubuntu_font_checksum }}"
         mode: "0600"
+      register: dotfiles_font_download
+      when: not ansible_check_mode or dotfiles_download_cache.stat.exists
 
     - name: Create the user font directory
       ansible.builtin.file:
         path: "{{ dotfiles_ubuntu_font_dir }}"
         state: directory
         mode: "0755"
+
+    - name: Inspect the font directory in check mode
+      ansible.builtin.stat:
+        path: "{{ dotfiles_ubuntu_font_dir }}"
+        follow: true
+        get_checksum: false
+        get_mime: false
+      register: dotfiles_font_directory
+      when: ansible_check_mode
 
     - name: Install SauceCodePro Nerd Font for the current user
       ansible.builtin.unarchive:
@@ -181,6 +260,11 @@
         remote_src: true
         mode: "u=rwX,go=rX"
       notify: Refresh the user font cache
+      when: >-
+        not ansible_check_mode
+        or (dotfiles_font_directory.stat.exists
+            and dotfiles_font_download is not skipped
+            and dotfiles_font_download is not changed)
 
     - name: Configure the shared terminal environment
       ansible.builtin.import_tasks: tasks/terminal.yml

@@ -4,4 +4,5 @@
 .venv/
 .ansible/
 .task/
+__pycache__/
 mise.local.toml

@@ -5,12 +5,23 @@
     state: directory
     mode: "0755"
 
+- name: Inspect the CLI directory in check mode
+  ansible.builtin.stat:
+    path: "{{ dotfiles_ubuntu_tools }}/{{ dotfiles_archive.name }}-{{ dotfiles_archive.version }}"
+    follow: true
+    get_checksum: false
+    get_mime: false
+  register: dotfiles_cli_directory
+  when: ansible_check_mode
+
 - name: Download the verified CLI archive
   ansible.builtin.get_url:
     url: "{{ dotfiles_archive.url }}"
     dest: "{{ dotfiles_ubuntu_cache }}/{{ dotfiles_archive.name }}-{{ dotfiles_archive.version }}.tar.gz"
     checksum: "{{ dotfiles_archive.checksums[dotfiles_ubuntu_architecture] }}"
     mode: "0600"
+  register: dotfiles_cli_download
+  when: not ansible_check_mode or dotfiles_download_cache.stat.exists
 
 - name: Extract the CLI executable
   ansible.builtin.unarchive:
@@ -20,6 +31,11 @@
     include:
       - "{{ dotfiles_archive.name }}"
     mode: "0755"
+  when: >-
+    not ansible_check_mode
+    or (dotfiles_cli_directory.stat.exists
+        and dotfiles_cli_download is not skipped
+        and dotfiles_cli_download is not changed)
 
 - name: Link the CLI without discarding an existing user-local command
   ansible.builtin.include_tasks: symlink.yml

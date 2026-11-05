@@ -211,9 +211,28 @@ within one minor version of your cluster.
 ### Ubuntu validation
 
 `mise exec -- task validate` covers both playbooks and their shared tasks.
-It checks syntax and lint, not installation. On a fresh Ubuntu system,
-`ubuntu:plan` may fail or give incomplete predictions because package installs,
-downloads, and archive extraction have not actually happened.
+It checks syntax and lint, not installation. When `ubuntu:plan` predicts changes
+to Docker's signing key or repository, it reports that Docker package checks are
+deferred: check mode cannot add the repository or refresh its package index.
+`ubuntu:apply` configures the repository and installs the clients normally;
+subsequent plans check the packages when the key and repository are unchanged.
+Downloads are deferred when their destination directories do not yet exist.
+Archive extraction is deferred when its destination directory is missing or its
+download is deferred or would change. npm package checks are deferred when
+`/usr/bin/npm` is missing. The plan explains these limitations; it does not
+create directories or install prerequisites to make a dry run succeed.
+Existing prerequisites still allow checks, but check mode cannot fully predict
+a fresh installation or validate new downloads, and network or package errors
+can still fail the plan.
+
+Run the isolated Ubuntu check-mode regression tests with:
+
+```sh
+mise exec -- uv run --no-sync --offline python -m unittest discover -s tests
+```
+
+These use temporary directories and a local HTTP server, not real system
+package installations or external downloads.
 
 Both playbooks passed offline syntax checks and ansible-lint with the pinned
 Ansible core 2.22.0, ansible-lint 26.10.1, and community.general 14.0.0 in a

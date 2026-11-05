@@ -169,5 +169,3 @@ else
   eval "$(/usr/bin/mise activate zsh)"
   source /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
 fi
-
-eval "$(mise activate zsh)"
