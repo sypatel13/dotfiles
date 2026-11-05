@@ -162,6 +162,12 @@ export FZF_DEFAULT_OPTS='
 
 eval "$(fzf --zsh)"
 
+alias ls='eza --long --git --icons=always --group-directories-first'
+alias la='eza --long --all --git --icons=always --group-directories-first'
+alias tree='eza --tree --all --icons'
+
+alias grep='rg --color=auto'
+
 if [[ "$OSTYPE" == darwin* ]]; then
   eval "$("$HOMEBREW_PREFIX/bin/mise" activate zsh)"
   source "$HOMEBREW_PREFIX/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
