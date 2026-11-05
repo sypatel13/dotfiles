@@ -1,4 +1,4 @@
-if [[ -z "${HOMEBREW_PREFIX:-}" ]]; then
+if [[ "$OSTYPE" != darwin* || -z "${HOMEBREW_PREFIX:-}" ]]; then
   source "$HOME/.zprofile"
 fi
 
@@ -86,7 +86,11 @@ zstyle ':omz:update' frequency 7
 # Custom plugins may be added to $ZSH_CUSTOM/plugins/
 # Example format: plugins=(rails git textmate ruby lighthouse)
 # Add wisely, as too many plugins slow down shell startup.
-plugins=(git docker kubectl python tmux macos deja)
+plugins=(git docker kubectl python tmux)
+if [[ "$OSTYPE" == darwin* ]]; then
+  plugins+=(macos)
+fi
+plugins+=(deja)
 
 # deja overrides
 export DEJA_ACCEPT_KEY=
@@ -158,6 +162,12 @@ export FZF_DEFAULT_OPTS='
 
 eval "$(fzf --zsh)"
 
-eval "$("$HOMEBREW_PREFIX/bin/mise" activate zsh)"
+if [[ "$OSTYPE" == darwin* ]]; then
+  eval "$("$HOMEBREW_PREFIX/bin/mise" activate zsh)"
+  source "$HOMEBREW_PREFIX/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
+else
+  eval "$(/usr/bin/mise activate zsh)"
+  source /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
+fi
 
-source "$HOMEBREW_PREFIX/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
+eval "$(mise activate zsh)"

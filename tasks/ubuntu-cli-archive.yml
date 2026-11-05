@@ -1,0 +1,29 @@
+---
+- name: Create the versioned CLI directory
+  ansible.builtin.file:
+    path: "{{ dotfiles_ubuntu_tools }}/{{ dotfiles_archive.name }}-{{ dotfiles_archive.version }}"
+    state: directory
+    mode: "0755"
+
+- name: Download the verified CLI archive
+  ansible.builtin.get_url:
+    url: "{{ dotfiles_archive.url }}"
+    dest: "{{ dotfiles_ubuntu_cache }}/{{ dotfiles_archive.name }}-{{ dotfiles_archive.version }}.tar.gz"
+    checksum: "{{ dotfiles_archive.checksums[dotfiles_ubuntu_architecture] }}"
+    mode: "0600"
+
+- name: Extract the CLI executable
+  ansible.builtin.unarchive:
+    src: "{{ dotfiles_ubuntu_cache }}/{{ dotfiles_archive.name }}-{{ dotfiles_archive.version }}.tar.gz"
+    dest: "{{ dotfiles_ubuntu_tools }}/{{ dotfiles_archive.name }}-{{ dotfiles_archive.version }}"
+    remote_src: true
+    include:
+      - "{{ dotfiles_archive.name }}"
+    mode: "0755"
+
+- name: Link the CLI without discarding an existing user-local command
+  ansible.builtin.include_tasks: symlink.yml
+  vars:
+    dotfiles_link:
+      src: "{{ dotfiles_ubuntu_tools }}/{{ dotfiles_archive.name }}-{{ dotfiles_archive.version }}/{{ dotfiles_archive.name }}"
+      dest: "{{ dotfiles_home }}/.local/bin/{{ dotfiles_archive.name }}"

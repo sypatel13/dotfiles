@@ -47,16 +47,16 @@ tasks:
       - task: lint
 
   syntax:
-    desc: Check Ansible playbook syntax
+    desc: Check macOS and Ubuntu playbook syntax
     deps: [check-env]
     cmds:
-      - uv run --no-sync --offline ansible-playbook -i localhost, playbook.yml --syntax-check
+      - uv run --no-sync --offline ansible-playbook -i localhost, playbook.yml ubuntu.yml --syntax-check
 
   lint:
     desc: Run ansible-lint offline
     deps: [check-env]
     cmds:
-      - uv run --no-sync --offline ansible-lint --offline playbook.yml tasks/symlink.yml
+      - uv run --no-sync --offline ansible-lint --offline playbook.yml ubuntu.yml tasks/
 
   plan:
     desc: Preview changes with Ansible check and diff mode
@@ -69,3 +69,15 @@ tasks:
     deps: [check-env]
     cmds:
       - uv run --no-sync ansible-playbook -i localhost, playbook.yml {{.CLI_ARGS}}
+
+  ubuntu:plan:
+    desc: Preview Ubuntu 26.04 changes with check and diff mode
+    deps: [check-env]
+    cmds:
+      - uv run --no-sync ansible-playbook -i localhost, ubuntu.yml --ask-become-pass --check --diff {{.CLI_ARGS}}
+
+  ubuntu:apply:
+    desc: Install tools and link configuration on Ubuntu 26.04
+    deps: [check-env]
+    cmds:
+      - uv run --no-sync ansible-playbook -i localhost, ubuntu.yml --ask-become-pass {{.CLI_ARGS}}

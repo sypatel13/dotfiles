@@ -1,0 +1,36 @@
+---
+- name: Install pinned shell frameworks without discarding local modifications
+  ansible.builtin.git:
+    repo: "{{ item.repo }}"
+    version: "{{ item.version }}"
+    dest: "{{ item.dest }}"
+    executable: "{{ dotfiles_git_bin_dir }}/git"
+    update: true
+    force: false
+  loop: "{{ dotfiles_shell_repositories }}"
+  loop_control:
+    label: "{{ item.dest }}"
+  environment:
+    GIT_TERMINAL_PROMPT: "0"
+
+- name: Link repository configuration files
+  ansible.builtin.include_tasks: symlink.yml
+  vars:
+    dotfiles_link:
+      src: "{{ playbook_dir }}/{{ dotfiles_config_path }}"
+      dest: "{{ dotfiles_home }}/{{ dotfiles_config_path }}"
+  loop: "{{ dotfiles_config_paths }}"
+  loop_control:
+    loop_var: dotfiles_config_path
+
+- name: Configure delta without replacing Git identity or credential settings
+  community.general.git_config:
+    name: "{{ item.name }}"
+    value: "{{ item.value }}"
+    scope: global
+    state: present
+  loop: "{{ dotfiles_git_settings }}"
+  loop_control:
+    label: "{{ item.name }}"
+  environment:
+    PATH: "{{ dotfiles_git_bin_dir }}:/usr/bin:/bin:/usr/sbin:/sbin"

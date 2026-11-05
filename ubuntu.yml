@@ -1,0 +1,206 @@
+---
+- name: Set up Ubuntu CLI tools and terminal configuration
+  hosts: localhost
+  connection: local
+  become: false
+  gather_facts: true
+  gather_subset:
+    - "!all"
+    - min
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+  vars_files:
+    - vars.yml
+    - vars.ubuntu.yml
+
+  pre_tasks:
+    - name: Require the pinned Ansible version and a non-root Ubuntu 26.04 user
+      ansible.builtin.assert:
+        that:
+          - ansible_version.full == '2.22.0'
+          - ansible_facts['distribution'] == 'Ubuntu'
+          - ansible_facts['distribution_version'] == '26.04'
+          - ansible_facts['architecture'] in ['x86_64', 'aarch64']
+          - ansible_facts['user_uid'] != 0
+          - dotfiles_home.startswith('/')
+          - dotfiles_home != '/'
+          - playbook_dir != dotfiles_home
+        fail_msg: >-
+          Run with the pinned virtual environment as your normal Ubuntu 26.04
+          amd64 or arm64 user, without sudo or --become. Only package tasks
+          request sudo. Keep this repository in its own directory.
+
+    - name: Inspect the system mise executable
+      ansible.builtin.stat:
+        path: /usr/bin/mise
+        follow: true
+        get_checksum: false
+        get_mime: false
+      register: dotfiles_mise
+
+    - name: Require the Ubuntu bootstrap before provisioning
+      ansible.builtin.assert:
+        that:
+          - dotfiles_mise.stat.exists
+          - dotfiles_mise.stat.executable | default(false)
+        fail_msg: >-
+          Follow the Ubuntu bootstrap in README.md to enable Universe and
+          install mise and python3-apt before running this playbook.
+
+  tasks:
+    - name: Install system packages and Docker clients
+      become: true
+      block:
+        - name: Install Ubuntu packages without upgrading existing packages
+          ansible.builtin.apt:
+            name: "{{ dotfiles_ubuntu_packages }}"
+            state: present
+            cache_valid_time: 3600
+            install_recommends: false
+            auto_install_module_deps: false
+            force_apt_get: true
+            fail_on_autoremove: true
+
+        - name: Create the APT keyring directory
+          ansible.builtin.file:
+            path: /etc/apt/keyrings
+            state: directory
+            mode: "0755"
+
+        - name: Install the verified Docker repository signing key
+          ansible.builtin.get_url:
+            url: https://download.docker.com/linux/ubuntu/gpg
+            dest: /etc/apt/keyrings/docker.asc
+            checksum: "sha256:1500c1f56fa9e26b9b8f42452a553675796ade0807cdce11975eb98170b3a570"
+            mode: "0644"
+          register: dotfiles_docker_key
+
+        - name: Configure the signed Docker repository for Ubuntu 26.04
+          ansible.builtin.copy:
+            dest: /etc/apt/sources.list.d/docker.sources
+            content: |
+              Types: deb
+              URIs: https://download.docker.com/linux/ubuntu
+              Suites: resolute
+              Components: stable
+              Architectures: {{ dotfiles_ubuntu_architecture }}
+              Signed-By: /etc/apt/keyrings/docker.asc
+            mode: "0644"
+            backup: true
+          register: dotfiles_docker_source
+
+        - name: Install standalone Docker clients without a daemon
+          ansible.builtin.apt:
+            name:
+              - docker-ce-cli
+              - docker-compose-plugin
+              - docker-buildx-plugin
+            state: present
+            update_cache: true
+            cache_valid_time: "{{ 0 if (dotfiles_docker_key is changed or dotfiles_docker_source is changed) else 3600 }}"
+            install_recommends: false
+            auto_install_module_deps: false
+            force_apt_get: true
+            fail_on_autoremove: true
+
+    - name: Create the private download cache
+      ansible.builtin.file:
+        path: "{{ dotfiles_ubuntu_cache }}"
+        state: directory
+        mode: "0700"
+
+    - name: Install pinned user-local CLI archives
+      ansible.builtin.include_tasks: tasks/ubuntu-cli-archive.yml
+      loop: "{{ dotfiles_ubuntu_archives }}"
+      loop_control:
+        loop_var: dotfiles_archive
+        label: "{{ dotfiles_archive.name }}"
+
+    - name: Create the pinned kubectl directory
+      ansible.builtin.file:
+        path: "{{ dotfiles_ubuntu_tools }}/kubectl-{{ dotfiles_ubuntu_kubectl_version }}"
+        state: directory
+        mode: "0755"
+
+    - name: Install the verified kubectl binary
+      ansible.builtin.get_url:
+        url: >-
+          https://dl.k8s.io/release/v{{ dotfiles_ubuntu_kubectl_version }}/bin/linux/{{ dotfiles_ubuntu_architecture }}/kubectl
+        dest: "{{ dotfiles_ubuntu_tools }}/kubectl-{{ dotfiles_ubuntu_kubectl_version }}/kubectl"
+        checksum: "{{ dotfiles_ubuntu_kubectl_checksums[dotfiles_ubuntu_architecture] }}"
+        mode: "0755"
+
+    - name: Link kubectl without discarding an existing user-local command
+      ansible.builtin.include_tasks: tasks/symlink.yml
+      vars:
+        dotfiles_link:
+          src: "{{ dotfiles_ubuntu_tools }}/kubectl-{{ dotfiles_ubuntu_kubectl_version }}/kubectl"
+          dest: "{{ dotfiles_home }}/.local/bin/kubectl"
+
+    - name: Install pinned npm CLIs in a dedicated user-owned prefix
+      community.general.npm:
+        name: "{{ item.package }}"
+        version: "{{ item.version }}"
+        global: true
+        state: present
+        executable: /usr/bin/npm
+      loop: "{{ dotfiles_ubuntu_npm_packages }}"
+      loop_control:
+        label: "{{ item.package }}"
+      environment:
+        PATH: /usr/bin:/bin
+        npm_config_prefix: "{{ dotfiles_ubuntu_tools }}/npm"
+
+    - name: Link npm CLIs without discarding existing user-local commands
+      ansible.builtin.include_tasks: tasks/symlink.yml
+      vars:
+        dotfiles_link:
+          src: "{{ dotfiles_ubuntu_tools }}/npm/bin/{{ dotfiles_npm_package.command }}"
+          dest: "{{ dotfiles_home }}/.local/bin/{{ dotfiles_npm_package.command }}"
+      loop: "{{ dotfiles_ubuntu_npm_packages }}"
+      loop_control:
+        loop_var: dotfiles_npm_package
+
+    - name: Download the verified SauceCodePro Nerd Font archive
+      ansible.builtin.get_url:
+        url: "https://github.com/ryanoasis/nerd-fonts/releases/download/v{{ dotfiles_ubuntu_font_version }}/SourceCodePro.tar.xz"
+        dest: "{{ dotfiles_ubuntu_cache }}/SourceCodePro-{{ dotfiles_ubuntu_font_version }}.tar.xz"
+        checksum: "{{ dotfiles_ubuntu_font_checksum }}"
+        mode: "0600"
+
+    - name: Create the user font directory
+      ansible.builtin.file:
+        path: "{{ dotfiles_ubuntu_font_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Install SauceCodePro Nerd Font for the current user
+      ansible.builtin.unarchive:
+        src: "{{ dotfiles_ubuntu_cache }}/SourceCodePro-{{ dotfiles_ubuntu_font_version }}.tar.xz"
+        dest: "{{ dotfiles_ubuntu_font_dir }}"
+        remote_src: true
+        mode: "u=rwX,go=rX"
+      notify: Refresh the user font cache
+
+    - name: Configure the shared terminal environment
+      ansible.builtin.import_tasks: tasks/terminal.yml
+      vars:
+        dotfiles_git_bin_dir: /usr/bin
+
+    - name: Explain the remaining interactive setup
+      ansible.builtin.debug:
+        msg:
+          - Start Zsh with zsh, or change your login shell yourself with chsh -s /usr/bin/zsh.
+          - "Backups of displaced files are under {{ dotfiles_backup_dir }}."
+          - Docker clients need an existing local or remote daemon; none is installed here.
+          - Authenticate gh and copilot yourself. Deja history import is optional and is not automated.
+          - Ghostty and other desktop applications are not installed.
+
+  handlers:
+    - name: Refresh the user font cache
+      ansible.builtin.command:
+        argv:
+          - /usr/bin/fc-cache
+          - -f
+          - "{{ dotfiles_ubuntu_font_dir }}"
+      changed_when: true
