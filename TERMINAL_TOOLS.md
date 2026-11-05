@@ -7,6 +7,24 @@ covers terminal and developer tooling, not all Mac applications or project-local
 dependencies. Installations are confirmed on the machine, not inferred solely
 from this repository's dotfiles.
 
+## Automated CLI setup
+
+[README.md](README.md) describes the Ansible setup in [playbook.yml](playbook.yml).
+It installs CLI tools and the terminal font, then symlinks the configurations
+with backups. It excludes desktop apps and VS Code extensions. Docker uses
+standalone clients instead of Docker Desktop, and shell initialization uses
+Homebrew's mise instead of the standalone copy.
+
+Project commands use mise-pinned Python, uv, and Task. Python dependencies
+live in [pyproject.toml](pyproject.toml) and [uv.lock](uv.lock); Galaxy collections
+remain separate in [collections.yml](collections.yml). Use the bootstrap and
+Task commands in [README.md](README.md), not the snapshot installation commands
+below, to set up this automation project.
+
+The inventory below describes the Mac at snapshot time. The repository
+configuration now includes the portability changes described in
+[Configuration snapshots](#configuration-snapshots).
+
 ## Homebrew-installed tools
 
 Homebrew is the package manager used for these tools.
@@ -177,7 +195,8 @@ which repeats the font family and size settings.
 
 ## Configuration snapshots
 
-These files capture the shell and terminal configuration as of 2026-11-04:
+These files capture the shell and terminal configuration as of 2026-11-04,
+with the Ansible setup changes noted below:
 
 | Repository file | Restore location | Contents |
 | --- | --- | --- |
@@ -188,10 +207,14 @@ These files capture the shell and terminal configuration as of 2026-11-04:
 | [.tmux.conf.local](.tmux.conf.local) | `~/.tmux.conf.local` | Local tmux settings |
 | [Ghostty config](.config/ghostty/config) | `~/.config/ghostty/config` | Font family, size 14, and Dracula theme selection |
 | [Ghostty Dracula theme](.config/ghostty/themes/dracula) | `~/.config/ghostty/themes/dracula` | Custom palette and terminal colors |
+| [Ghostty native config](.config/ghostty/config.ghostty) | `~/Library/Application Support/com.mitchellh.ghostty/config.ghostty` | Comment-only file that leaves settings in the shared config |
 
 Both tmux files already matched the live configuration and were left unchanged.
-The Zsh files replace username-specific home paths with `$HOME`. Other shell
-settings match the live files. The repository's Ghostty config intentionally
+The Zsh files use `$HOME`, detect Homebrew at its standard Apple Silicon or
+Intel prefix, and activate Homebrew's mise. Deja key bindings are configured
+before its plugin loads, and syntax highlighting loads last. Oh My Zsh
+automatic updates are disabled because Ansible manages its pinned revision.
+The repository's Ghostty config intentionally
 uses `SauceCodePro Nerd Font Mono` instead of the live config's
 `SourceCodePro Mono`, which is not the installed family name. The duplicate
 macOS-specific Ghostty settings are consolidated into this one repository file.
@@ -223,10 +246,9 @@ Install the Homebrew tools above and Ghostty first. Restore Oh My Zsh at
 and the Deja integration at `~/.oh-my-zsh/custom/plugins/deja`. These
 frameworks and plugins are not included in the config snapshots.
 
-The copied Zsh config still calls `~/.local/bin/mise`. Restore that standalone
-installation, or change its activation line to `eval "$(mise activate zsh)"`
-to use the Homebrew copy on PATH. Install the font described above before
-using the Ghostty config.
+The repository Zsh config uses Homebrew's mise and syntax-highlighting paths.
+It does not need the standalone mise executable. Install the font described
+above before using the Ghostty config.
 
 Back up existing files, then run these commands from the repository root.
 `cp -i` prompts before overwriting an existing file:
@@ -236,16 +258,19 @@ cp -i .zshrc .zprofile .p10k.zsh .tmux.conf .tmux.conf.local "$HOME/"
 mkdir -p "$HOME/.config/ghostty/themes"
 cp -i .config/ghostty/config "$HOME/.config/ghostty/config"
 cp -i .config/ghostty/themes/dracula "$HOME/.config/ghostty/themes/dracula"
+mkdir -p "$HOME/Library/Application Support/com.mitchellh.ghostty"
+cp -i .config/ghostty/config.ghostty "$HOME/Library/Application Support/com.mitchellh.ghostty/config.ghostty"
 ```
 
 If `~/Library/Application Support/com.mitchellh.ghostty/config.ghostty`
-already exists, back it up and remove its duplicate font settings or align
-them with the repository config. Ghostty also loads this file; it can add
-fallback font families or override the font size.
+already exists, back it up before replacing it with the comment-only file
+above. Ghostty also loads this location; leftover settings can add fallback
+font families or override the font size. Ansible makes this backup automatically.
 
 Open a new terminal session after restoring. The repository copies do not
-change the running Mac configuration until you install them. Future changes
-to the live files are not synchronized back to this repository automatically.
+change the running Mac configuration until you install them. Manual copies
+are not synchronized back to this repository. Ansible uses symlinks instead,
+so edits through those links change the repository files.
 
 ## Accuracy and restoration notes
 
@@ -257,8 +282,8 @@ to the live files are not synchronized back to this repository automatically.
   `openssl` resolves to `/usr/bin/openssl`; use the explicit Homebrew path
   above for OpenSSL 3.
 - Both mise installations report no managed runtimes. Restoring only the
-  Homebrew package will not recreate `~/.local/bin/mise`; restore that
-  standalone executable or change shell initialization to use the Homebrew copy.
+  Homebrew package will not recreate `~/.local/bin/mise`. The repository
+  shell initialization now uses the Homebrew copy instead.
 - The global npm inventory contains only npm itself. Homebrew Python's package
   inventory contains only pip and wheel. No additional CLI tools were found
   in those package inventories.

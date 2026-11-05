@@ -1,3 +1,7 @@
 .code_profiles/*
 !.code_profiles/extensions*.txt
 !.code_profiles/settings*.json
+.venv/
+.ansible/
+.task/
+mise.local.toml

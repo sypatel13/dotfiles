@@ -1,0 +1,12 @@
+[tools]
+python = "3.13.18"
+uv = "0.13.7"
+task = "3.54.0"
+
+[env]
+# Resolve Python after mise adds the installed project tools to PATH.
+UV_PYTHON = "python"
+UV_PYTHON_DOWNLOADS = "never"
+
+[settings]
+exec_auto_install = false

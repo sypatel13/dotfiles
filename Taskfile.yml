@@ -1,0 +1,71 @@
+---
+version: "3"
+
+env:
+  ANSIBLE_COLLECTIONS_PATH: "{{.ROOT_DIR}}/.ansible/collections"
+  UV_PROJECT_ENVIRONMENT: "{{.ROOT_DIR}}/.venv"
+
+tasks:
+  default:
+    desc: List available tasks
+    cmds:
+      - task --list
+
+  setup:
+    desc: Install locked Python dependencies and pinned Ansible collections
+    cmds:
+      - task: sync
+      - task: collections
+
+  sync:
+    desc: Sync the project virtual environment from uv.lock
+    cmds:
+      - uv sync --locked
+
+  # uv run --no-sync skips both lockfile and environment freshness checks.
+  check-env:
+    internal: true
+    run: once
+    cmds:
+      - uv sync --check --locked --offline
+
+  collections:
+    desc: Install pinned Galaxy collections into the project
+    deps: [check-env]
+    cmds:
+      - uv run --no-sync ansible-galaxy collection install -r collections.yml -p "$ANSIBLE_COLLECTIONS_PATH"
+
+  lock:
+    desc: Update uv.lock after changing Python dependencies
+    cmds:
+      - uv lock
+
+  validate:
+    desc: Check the lockfile, playbook syntax, and lint without installing dependencies
+    cmds:
+      - task: syntax
+      - task: lint
+
+  syntax:
+    desc: Check Ansible playbook syntax
+    deps: [check-env]
+    cmds:
+      - uv run --no-sync --offline ansible-playbook -i localhost, playbook.yml --syntax-check
+
+  lint:
+    desc: Run ansible-lint offline
+    deps: [check-env]
+    cmds:
+      - uv run --no-sync --offline ansible-lint --offline playbook.yml tasks/symlink.yml
+
+  plan:
+    desc: Preview changes with Ansible check and diff mode
+    deps: [check-env]
+    cmds:
+      - uv run --no-sync ansible-playbook -i localhost, playbook.yml --check --diff {{.CLI_ARGS}}
+
+  apply:
+    desc: Install tools and link configuration on this Mac
+    deps: [check-env]
+    cmds:
+      - uv run --no-sync ansible-playbook -i localhost, playbook.yml {{.CLI_ARGS}}

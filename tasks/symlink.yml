@@ -1,0 +1,90 @@
+---
+- name: Inspect the symlink source
+  ansible.builtin.stat:
+    path: "{{ dotfiles_link.src }}"
+    follow: true
+    get_checksum: false
+    get_mime: false
+  register: dotfiles_link_source
+
+- name: Require a regular source file before changing the destination
+  ansible.builtin.assert:
+    that:
+      - dotfiles_link.src != dotfiles_link.dest
+      - ansible_check_mode or (dotfiles_link_source.stat.isreg | default(false))
+    fail_msg: "Missing or invalid source file: {{ dotfiles_link.src }}. No destination has been moved."
+
+- name: Inspect the destination without following existing symlinks
+  ansible.builtin.stat:
+    path: "{{ dotfiles_link.dest }}"
+    follow: false
+    get_checksum: false
+    get_mime: false
+  register: dotfiles_link_destination
+
+- name: Refuse to replace directories or special files
+  ansible.builtin.assert:
+    that:
+      - >-
+        not dotfiles_link_destination.stat.exists
+        or (dotfiles_link_destination.stat.isreg | default(false))
+        or (dotfiles_link_destination.stat.islnk | default(false))
+    fail_msg: "Refusing to replace {{ dotfiles_link.dest }} because it is not a regular file or symlink."
+
+- name: Back up a displaced file or symlink
+  when:
+    - dotfiles_link_destination.stat.exists
+    - >-
+      not (dotfiles_link_destination.stat.islnk | default(false))
+      or dotfiles_link_destination.stat.lnk_source != dotfiles_link.src
+    - not ansible_check_mode
+  block:
+    - name: Create the private backup directory
+      ansible.builtin.file:
+        path: "{{ dotfiles_backup_dir }}"
+        state: directory
+        mode: "0700"
+
+    - name: Allocate a unique backup location
+      ansible.builtin.tempfile:
+        path: "{{ dotfiles_backup_dir }}"
+        prefix: "{{ dotfiles_link.dest | basename }}."
+        state: directory
+      register: dotfiles_link_backup
+
+    # Moving the link itself preserves its original target, including dangling links.
+    - name: Move the existing destination into its backup directory
+      ansible.builtin.command:
+        argv:
+          - /bin/mv
+          - "{{ dotfiles_link.dest }}"
+          - "{{ dotfiles_link_backup.path }}/original"
+        expand_argument_vars: false
+      changed_when: true
+
+    - name: Report the backup location
+      ansible.builtin.debug:
+        msg: "Backed up {{ dotfiles_link.dest }} to {{ dotfiles_link_backup.path }}/original"
+
+- name: Inspect the destination directory
+  ansible.builtin.stat:
+    path: "{{ dotfiles_link.dest | dirname }}"
+    follow: true
+    get_checksum: false
+    get_mime: false
+  register: dotfiles_link_parent
+
+- name: Create a missing destination directory without changing existing permissions
+  ansible.builtin.file:
+    path: "{{ dotfiles_link.dest | dirname }}"
+    state: directory
+    mode: "0755"
+  when: not dotfiles_link_parent.stat.exists
+
+- name: Link the configuration or executable
+  ansible.builtin.file:
+    src: "{{ dotfiles_link.src }}"
+    dest: "{{ dotfiles_link.dest }}"
+    state: link
+    follow: false
+    force: "{{ ansible_check_mode }}"

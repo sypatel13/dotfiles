@@ -1,0 +1,154 @@
+---
+- name: Set up MacBook CLI tools and terminal configuration
+  hosts: localhost
+  connection: local
+  become: false
+  gather_facts: true
+  gather_subset:
+    - "!all"
+    - min
+  vars:
+    ansible_python_interpreter: "{{ ansible_playbook_python }}"
+  vars_files:
+    - vars.yml
+
+  pre_tasks:
+    - name: Require the pinned Ansible version and a non-root macOS user
+      ansible.builtin.assert:
+        that:
+          - ansible_version.full == '2.22.0'
+          - ansible_facts['system'] == 'Darwin'
+          - ansible_facts['architecture'] in ['arm64', 'x86_64']
+          - ansible_facts['user_uid'] != 0
+          - dotfiles_home.startswith('/')
+          - dotfiles_home != '/'
+          - playbook_dir != dotfiles_home
+          - dotfiles_homebrew_prefix in ['/opt/homebrew', '/usr/local']
+        fail_msg: >-
+          Run with the pinned virtual environment as your normal macOS user,
+          without sudo or become. Keep this repository in its own directory.
+          Only standard Apple Silicon and Intel Homebrew prefixes are supported.
+
+    - name: Inspect the Homebrew executable
+      ansible.builtin.stat:
+        path: "{{ dotfiles_homebrew_prefix }}/bin/brew"
+        follow: true
+        get_checksum: false
+        get_mime: false
+      register: dotfiles_brew
+
+    - name: Require Homebrew before installing packages
+      ansible.builtin.assert:
+        that:
+          - dotfiles_brew.stat.exists
+          - dotfiles_brew.stat.executable | default(false)
+        fail_msg: >-
+          Install current Homebrew from https://brew.sh at
+          {{ dotfiles_homebrew_prefix }} before running this playbook.
+
+    - name: Check that Apple developer tools are selected
+      ansible.builtin.command:
+        argv:
+          - /usr/bin/xcode-select
+          - --print-path
+      changed_when: false
+      check_mode: false
+
+  tasks:
+    - name: Install CLI packages
+      environment:
+        HOMEBREW_NO_AUTO_UPDATE: "1"
+        HOMEBREW_NO_ANALYTICS: "1"
+        HOMEBREW_NO_INSTALL_CLEANUP: "1"
+      block:
+        - name: Tap and trust the Task repository
+          community.general.homebrew_tap:
+            name: go-task/tap
+            state: present
+            trust: true
+            path: "{{ dotfiles_homebrew_prefix }}/bin"
+
+        - name: Install Homebrew formulae without upgrading existing packages
+          community.general.homebrew:
+            name: "{{ dotfiles_formulae }}"
+            state: present
+            update_homebrew: false
+            path: "{{ dotfiles_homebrew_prefix }}/bin"
+
+        - name: Install CLI casks and adopt matching terminal fonts
+          community.general.homebrew_cask:
+            name: "{{ item }}"
+            state: present
+            update_homebrew: false
+            path: "{{ dotfiles_homebrew_prefix }}/bin"
+            install_options: "{{ ['adopt'] if item == 'font-sauce-code-pro-nerd-font' else [] }}"
+          loop: "{{ dotfiles_casks }}"
+
+    - name: Install pinned shell frameworks without discarding local modifications
+      ansible.builtin.git:
+        repo: "{{ item.repo }}"
+        version: "{{ item.version }}"
+        dest: "{{ item.dest }}"
+        executable: "{{ dotfiles_homebrew_prefix }}/bin/git"
+        update: true
+        force: false
+      loop: "{{ dotfiles_shell_repositories }}"
+      loop_control:
+        label: "{{ item.dest }}"
+      environment:
+        GIT_TERMINAL_PROMPT: "0"
+
+    - name: Link repository configuration files
+      ansible.builtin.include_tasks: tasks/symlink.yml
+      vars:
+        dotfiles_link:
+          src: "{{ playbook_dir }}/{{ dotfiles_config_path }}"
+          dest: "{{ dotfiles_home }}/{{ dotfiles_config_path }}"
+      loop: "{{ dotfiles_config_paths }}"
+      loop_control:
+        loop_var: dotfiles_config_path
+
+    - name: Prevent native Ghostty settings from overriding the shared configuration
+      ansible.builtin.include_tasks: tasks/symlink.yml
+      vars:
+        dotfiles_link:
+          src: "{{ playbook_dir }}/.config/ghostty/config.ghostty"
+          dest: "{{ dotfiles_home }}/Library/Application Support/com.mitchellh.ghostty/config.ghostty"
+
+    - name: Create the private Docker configuration directory
+      ansible.builtin.file:
+        path: "{{ dotfiles_home }}/.docker"
+        state: directory
+        mode: "0700"
+
+    - name: Make standalone Docker plugins discoverable without changing credentials
+      ansible.builtin.include_tasks: tasks/symlink.yml
+      vars:
+        dotfiles_link:
+          src: "{{ dotfiles_homebrew_prefix }}/lib/docker/cli-plugins/docker-{{ dotfiles_docker_plugin }}"
+          dest: "{{ dotfiles_home }}/.docker/cli-plugins/docker-{{ dotfiles_docker_plugin }}"
+      loop:
+        - compose
+        - buildx
+      loop_control:
+        loop_var: dotfiles_docker_plugin
+
+    - name: Configure delta without replacing Git identity or credential settings
+      community.general.git_config:
+        name: "{{ item.name }}"
+        value: "{{ item.value }}"
+        scope: global
+        state: present
+      loop: "{{ dotfiles_git_settings }}"
+      loop_control:
+        label: "{{ item.name }}"
+      environment:
+        PATH: "{{ dotfiles_homebrew_prefix }}/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+
+    - name: Explain the remaining interactive setup
+      ansible.builtin.debug:
+        msg:
+          - Open a new Zsh session after applying the playbook.
+          - "Backups of displaced files are under {{ dotfiles_backup_dir }}."
+          - Docker clients need an existing local or remote daemon; none is installed here.
+          - Authenticate gh and copilot yourself. Deja history import is optional and is not automated.

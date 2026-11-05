@@ -1,3 +1,7 @@
+if [[ -z "${HOMEBREW_PREFIX:-}" ]]; then
+  source "$HOME/.zprofile"
+fi
+
 # Enable Powerlevel10k instant prompt. Should stay close to the top of ~/.zshrc.
 # Initialization code that may require console input (password prompts, [y/n]
 # confirmations, etc.) must go above this block; everything else may go below.
@@ -33,8 +37,8 @@ ZSH_THEME="powerlevel10k/powerlevel10k"
 # HYPHEN_INSENSITIVE="true"
 
 # Uncomment one of the following lines to change the auto-update behavior
-# zstyle ':omz:update' mode disabled  # disable automatic updates
-zstyle ':omz:update' mode auto      # update automatically without asking
+zstyle ':omz:update' mode disabled  # revisions are managed by Ansible
+# zstyle ':omz:update' mode auto    # update automatically without asking
 # zstyle ':omz:update' mode reminder  # just remind me to update when it's time
 
 # Uncomment the following line to change the frequency the auto-updater is run (in days).
@@ -84,7 +88,14 @@ zstyle ':omz:update' frequency 7
 # Add wisely, as too many plugins slow down shell startup.
 plugins=(git docker kubectl python tmux macos deja)
 
-source $ZSH/oh-my-zsh.sh
+# deja overrides
+export DEJA_ACCEPT_KEY=
+export DEJA_CYCLE_KEY=^N
+export DEJA_CYCLE_FUZZY_KEY=
+export DEJA_CYCLE_FUZZY_BACK_KEY=
+export DEJA_TOGGLE_EMPTY_KEY=
+
+source "$ZSH/oh-my-zsh.sh"
 
 # User configuration
 
@@ -117,7 +128,6 @@ source $ZSH/oh-my-zsh.sh
 
 # To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
 [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
-source /opt/homebrew/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
 
 # options
 setopt append_history
@@ -128,13 +138,6 @@ setopt hist_find_no_dups
 setopt hist_reduce_blanks
 setopt no_beep
 setopt inc_append_history
-
-# deja overrides
-export DEJA_ACCEPT_KEY=
-export DEJA_CYCLE_KEY=^N
-export DEJA_CYCLE_FUZZY_KEY=
-export DEJA_CYCLE_FUZZY_BACK_KEY=
-export DEJA_TOGGLE_EMPTY_KEY=
 
 # history
 HISTFILE=$HOME/.zsh_history
@@ -155,4 +158,6 @@ export FZF_DEFAULT_OPTS='
 
 eval "$(fzf --zsh)"
 
-eval "$("$HOME/.local/bin/mise" activate zsh)" # added by https://mise.run/zsh
+eval "$("$HOMEBREW_PREFIX/bin/mise" activate zsh)"
+
+source "$HOMEBREW_PREFIX/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"

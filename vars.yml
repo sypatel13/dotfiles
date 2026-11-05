@@ -1,0 +1,60 @@
+---
+dotfiles_home: "{{ ansible_facts['user_dir'] }}"
+dotfiles_backup_dir: "{{ dotfiles_home }}/.local/state/dotfiles/backups"
+dotfiles_homebrew_prefix: "{{ '/opt/homebrew' if ansible_facts['architecture'] == 'arm64' else '/usr/local' }}"
+
+dotfiles_formulae:
+  - git
+  - gh
+  - git-delta
+  - tmux
+  - zsh
+  - deja
+  - zsh-syntax-highlighting
+  - fzf
+  - eza
+  - ripgrep
+  - mise
+  - node
+  - python@3.13
+  - openspec
+  - openssl@3
+  - docker
+  - docker-compose
+  - docker-buildx
+  - kubernetes-cli
+
+dotfiles_casks:
+  - copilot-cli
+  - go-task/tap/go-task
+  - font-sauce-code-pro-nerd-font
+
+dotfiles_shell_repositories:
+  - repo: https://github.com/ohmyzsh/ohmyzsh.git
+    version: b509b1c6ed0c1ba37de12cbd37f30b2b2f61193a
+    dest: "{{ dotfiles_home }}/.oh-my-zsh"
+  - repo: https://github.com/romkatv/powerlevel10k.git
+    version: 7ddd1b2715c3844275214347a3572ac1fdd6dc39
+    dest: "{{ dotfiles_home }}/.oh-my-zsh/custom/themes/powerlevel10k"
+  - repo: https://github.com/Giammarco-Ferranti/deja.git
+    version: 97156840defebb476be0bbc97bbcca3b75934c66
+    dest: "{{ dotfiles_home }}/.oh-my-zsh/custom/plugins/deja"
+
+dotfiles_config_paths:
+  - .zprofile
+  - .zshrc
+  - .p10k.zsh
+  - .tmux.conf
+  - .tmux.conf.local
+  - .config/ghostty/config
+  - .config/ghostty/themes/dracula
+
+dotfiles_git_settings:
+  - name: core.pager
+    value: delta
+  - name: interactive.diffFilter
+    value: delta --color-only
+  - name: delta.side-by-side
+    value: "true"
+  - name: delta.line-numbers
+    value: "true"
