@@ -168,10 +168,16 @@ alias tree='eza --tree --all --icons'
 
 alias grep='rg --color=auto'
 
-if [[ "$OSTYPE" == darwin* ]]; then
+if [[ "$OSTYPE" == darwin* || ( -n "${HOMEBREW_PREFIX:-}" && -x "$HOMEBREW_PREFIX/bin/mise" ) ]]; then
+  # macOS and Bazzite use Homebrew's mise and syntax highlighting.
   eval "$("$HOMEBREW_PREFIX/bin/mise" activate zsh)"
   source "$HOMEBREW_PREFIX/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
 else
   eval "$(/usr/bin/mise activate zsh)"
-  source /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
+  # Arch-based systems such as CachyOS install Zsh plugins under /usr/share/zsh/plugins.
+  if [[ -r /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ]]; then
+    source /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
+  else
+    source /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
+  fi
 fi

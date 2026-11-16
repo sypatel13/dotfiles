@@ -36,7 +36,7 @@
     - dotfiles_link_destination.stat.exists
     - >-
       not (dotfiles_link_destination.stat.islnk | default(false))
-      or dotfiles_link_destination.stat.lnk_source != dotfiles_link.src
+      or dotfiles_link_destination.stat.lnk_target != dotfiles_link.src
     - not ansible_check_mode
   block:
     - name: Create the private backup directory

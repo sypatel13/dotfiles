@@ -1,0 +1,34 @@
+---
+- name: Inspect the system npm executable in check mode
+  ansible.builtin.stat:
+    path: /usr/bin/npm
+    follow: true
+    get_checksum: false
+    get_mime: false
+  register: dotfiles_linux_npm
+  when: ansible_check_mode
+
+- name: Install pinned npm CLIs in a dedicated user-owned prefix
+  community.general.npm:
+    name: "{{ item.package }}"
+    version: "{{ item.version }}"
+    global: true
+    state: present
+    executable: /usr/bin/npm
+  loop: "{{ dotfiles_npm_packages }}"
+  loop_control:
+    label: "{{ item.package }}"
+  environment:
+    PATH: /usr/bin:/bin
+    npm_config_prefix: "{{ dotfiles_linux_tools }}/npm"
+  when: not ansible_check_mode or dotfiles_linux_npm.stat.exists
+
+- name: Link npm CLIs without discarding existing user-local commands
+  ansible.builtin.include_tasks: symlink.yml
+  vars:
+    dotfiles_link:
+      src: "{{ dotfiles_linux_tools }}/npm/bin/{{ dotfiles_npm_package.command }}"
+      dest: "{{ dotfiles_home }}/.local/bin/{{ dotfiles_npm_package.command }}"
+  loop: "{{ dotfiles_npm_packages }}"
+  loop_control:
+    loop_var: dotfiles_npm_package

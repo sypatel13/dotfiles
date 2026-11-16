@@ -5,9 +5,14 @@
 to this checkout on Apple Silicon or Intel Macs.
 [ubuntu.yml](ubuntu.yml) provides the equivalent CLI setup for Ubuntu 26.04
 on amd64 or arm64, without Homebrew. See [Ubuntu setup](#ubuntu-setup).
-Both run locally as your normal user. Do not launch either with `sudo`,
+[cachyos.yml](cachyos.yml) uses pacman packages on CachyOS, and
+[bazzite.yml](bazzite.yml) uses Homebrew on Bazzite. See
+[CachyOS setup](#cachyos-setup) and [Bazzite setup](#bazzite-setup).
+All run locally as your normal user. Do not launch any of them with `sudo`,
 `--become`, or concurrently with another setup run. The Ubuntu playbook
-requests sudo only for its system package and APT repository tasks.
+requests sudo only for its system package and APT repository tasks. The
+CachyOS playbook requests sudo only for its package, Docker service, and
+group tasks. The macOS and Bazzite playbooks do not use sudo.
 
 ## What the MacBook setup manages
 
@@ -92,8 +97,9 @@ environment without changing either. Run setup again after dependency changes.
 To change Python dependencies, edit
 [pyproject.toml](pyproject.toml), run `mise exec -- task lock`, and commit both
 the manifest and [uv.lock](uv.lock). Keep the core version assertions in
-[playbook.yml](playbook.yml) and [ubuntu.yml](ubuntu.yml) aligned if you change
-Ansible core.
+[playbook.yml](playbook.yml), [ubuntu.yml](ubuntu.yml),
+[cachyos.yml](cachyos.yml), and [bazzite.yml](bazzite.yml) aligned if you
+change Ansible core.
 
 Homebrew packages use `state: present`, not `latest`. Reruns do not request
 upgrades of installed tools. New installs use the versions Homebrew currently
@@ -141,7 +147,9 @@ the shell framework pins, configuration and Git links, and backups with the
 MacBook playbook through [vars.yml](vars.yml) and
 [tasks/terminal.yml](tasks/terminal.yml).
 
-[vars.ubuntu.yml](vars.ubuntu.yml) defines the Ubuntu packages and release pins:
+[vars.ubuntu.yml](vars.ubuntu.yml) defines the Ubuntu packages and release pins.
+[vars.linux.yml](vars.linux.yml) holds the user-local install paths and the
+Deja and OpenSpec pins it shares with CachyOS:
 
 - Ubuntu APT packages supply Git, gh, delta, tmux, Zsh, syntax highlighting,
   fzf, eza, ripgrep, Node.js, npm, OpenSSL, and basic developer utilities.
@@ -214,7 +222,7 @@ within one minor version of your cluster.
 
 ### Ubuntu validation
 
-`mise exec -- task validate` covers both playbooks and their shared tasks.
+`mise exec -- task validate` covers all four playbooks and their shared tasks.
 It checks syntax and lint, not installation. When `ubuntu:plan` predicts changes
 to Docker's signing key or repository, it reports that Docker package checks are
 deferred: check mode cannot add the repository or refresh its package index.
@@ -252,6 +260,121 @@ should report `changed=0`. Check the backup cases below and confirm
 `copilot --version`, and `openspec --version`. Confirm that
 `fc-match 'SauceCodePro Nerd Font Mono'` resolves the installed font.
 No Ubuntu provisioning or second-run convergence has been tested here.
+
+## CachyOS setup
+
+[cachyos.yml](cachyos.yml) supports CachyOS on x86_64. Ansible reports CachyOS
+as Arch Linux, so the playbook checks `ID=cachyos` in `/etc/os-release`. It
+shares the shell framework pins, configuration and Git links, and backups with
+the other playbooks through [vars.yml](vars.yml) and
+[tasks/terminal.yml](tasks/terminal.yml). It reuses Ubuntu's user-local Deja
+and OpenSpec installs through [vars.linux.yml](vars.linux.yml).
+
+[vars.cachyos.yml](vars.cachyos.yml) defines the packages:
+
+- Native pacman packages supply Git, gh, delta, tmux, Zsh, syntax highlighting,
+  fzf, eza, ripgrep, mise, Node.js, npm, Python, OpenSSL, Task, kubectl,
+  SauceCodePro Nerd Font, and basic developer utilities. The Copilot CLI comes
+  from the `github-copilot-cli` package in the `cachyos` repository.
+- Arch names Task's executable `go-task`, so the playbook links it as
+  `~/.local/bin/task`.
+- The `docker`, `docker-compose`, and `docker-buildx` packages supply the
+  daemon, client, and plugins. The playbook enables and starts
+  `docker.service` and adds you to the `docker` group. That group grants
+  root-equivalent access and takes effect after you log in again. Docker
+  credentials and contexts are not edited.
+- Deja and OpenSpec are not packaged, so they use the same pinned,
+  SHA-256-verified download and user-owned npm prefix as Ubuntu.
+
+The shared Zsh files use `/usr/bin/mise` and Arch's
+`/usr/share/zsh/plugins/zsh-syntax-highlighting` path. An existing CachyOS
+`~/.zshrc` is backed up and replaced by the repository link.
+
+pacman uses `state: present` and does not refresh the sync databases, because
+refreshing them without a full upgrade is an unsupported partial upgrade.
+Run `sudo pacman -Syu` yourself before setup. pacman refuses conflicting
+packages, such as an installed `nodejs-lts-*` in place of `nodejs`, instead of
+replacing them. Resolve those conflicts before retrying.
+
+### CachyOS bootstrap
+
+Use your normal sudo-enabled user and a permanent checkout location:
+
+```sh
+sudo pacman -Syu --needed git mise python
+```
+
+From the repository root, review and trust the mise configuration, then:
+
+```sh
+mise trust
+mise install
+mise exec -- task setup
+mise exec -- task cachyos:plan
+mise exec -- task cachyos:apply
+```
+
+Both CachyOS tasks prompt for your sudo password and accept extra Ansible
+arguments after `--`. Only the package, Docker service, and group tasks
+escalate privileges. The plan defers Docker service and group checks until the
+`docker` package is installed, and defers downloads and npm checks as
+described in [Ubuntu validation](#ubuntu-validation).
+
+CachyOS defaults to fish. Start `zsh` after setup, or run
+`chsh -s /usr/bin/zsh` yourself and log in again. Log in again before using
+Docker without sudo. Authenticate with `gh auth login` and `copilot` yourself.
+
+On this CachyOS machine, `cachyos.yml` passed a check-mode run with privilege
+escalation disabled. It has not been applied, and second-run convergence is
+untested.
+
+## Bazzite setup
+
+[bazzite.yml](bazzite.yml) supports Bazzite on x86_64 and checks `ID=bazzite`
+in `/etc/os-release`. Bazzite's image is immutable, so the playbook uses
+Homebrew at `/home/linuxbrew/.linuxbrew`, as Bazzite recommends for CLI tools.
+It does not layer packages with rpm-ostree, change system services, or use
+sudo. It shares [tasks/homebrew.yml](tasks/homebrew.yml) with the MacBook
+playbook and [tasks/terminal.yml](tasks/terminal.yml) with all playbooks.
+
+[vars.bazzite.yml](vars.bazzite.yml) installs the same formulae as macOS
+plus homebrew-core's `go-task`. The Task tap's cask runs a macOS-only
+post-install step, so it is skipped. The `copilot-cli` and
+`font-sauce-code-pro-nerd-font` casks install on Linux; the font goes
+under `~/.local/share/fonts`. Docker plugin links point to Homebrew's
+`docker-compose` and `docker-buildx`.
+
+The shared Zsh files load Homebrew's environment and use its mise and syntax
+highlighting when `HOMEBREW_PREFIX` contains mise.
+
+### Bazzite bootstrap
+
+Homebrew normally ships with Bazzite. The playbook stops if
+`/home/linuxbrew/.linuxbrew/bin/brew` is missing. From the repository root:
+
+```sh
+brew install mise
+mise trust
+mise install
+mise exec -- task setup
+mise exec -- task bazzite:plan
+mise exec -- task bazzite:apply
+```
+
+Neither Bazzite task prompts for a password. Packages use `state: present`
+with automatic Homebrew updates disabled, as on macOS.
+
+Bazzite recommends launching Zsh from your terminal profile instead of using
+`chsh`. Set the profile's custom command to
+`/home/linuxbrew/.linuxbrew/bin/zsh`. On Linux, the shared Zsh config sets
+`SHELL` to Zsh when your login shell differs, so tmux also opens Zsh. No
+Docker daemon is installed or
+enabled. Use Podman's Docker-compatible socket or a separately configured
+daemon or remote context. Authenticate with `gh auth login` and `copilot`
+yourself.
+
+`bazzite.yml` passed syntax checks and lint only. No Bazzite run has been
+tested.
 
 ## Symlinks and backups
 
@@ -321,7 +444,7 @@ mise exec -- task validate
 ```
 
 This checks the lockfile and environment, then runs `task syntax` and `task lint`
-sequentially for both platforms. Both use the existing uv environment with
+sequentially for all platforms. Both use the existing uv environment with
 automatic synchronization disabled.
 Validation runs offline and does not invoke `task setup` or contact the Mac
 through a provisioning run. Ansible configuration and plugins can still

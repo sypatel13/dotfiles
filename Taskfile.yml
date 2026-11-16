@@ -53,16 +53,16 @@ tasks:
       - task: lint
 
   syntax:
-    desc: Check macOS and Ubuntu playbook syntax
+    desc: Check macOS, Ubuntu, CachyOS, and Bazzite playbook syntax
     deps: [check-env]
     cmds:
-      - uv run --no-sync --offline ansible-playbook -i localhost, playbook.yml ubuntu.yml --syntax-check
+      - uv run --no-sync --offline ansible-playbook -i localhost, playbook.yml ubuntu.yml cachyos.yml bazzite.yml --syntax-check
 
   lint:
     desc: Run ansible-lint offline
     deps: [check-env]
     cmds:
-      - uv run --no-sync --offline ansible-lint --offline playbook.yml ubuntu.yml tasks/
+      - uv run --no-sync --offline ansible-lint --offline playbook.yml ubuntu.yml cachyos.yml bazzite.yml tasks/
 
   plan:
     desc: Preview changes with Ansible check and diff mode
@@ -87,3 +87,27 @@ tasks:
     deps: [check-env]
     cmds:
       - uv run --no-sync ansible-playbook -i localhost, ubuntu.yml --ask-become-pass {{.CLI_ARGS}}
+
+  cachyos:plan:
+    desc: Preview CachyOS changes with check and diff mode
+    deps: [check-env]
+    cmds:
+      - uv run --no-sync ansible-playbook -i localhost, cachyos.yml --ask-become-pass --check --diff {{.CLI_ARGS}}
+
+  cachyos:apply:
+    desc: Install tools, enable Docker, and link configuration on CachyOS
+    deps: [check-env]
+    cmds:
+      - uv run --no-sync ansible-playbook -i localhost, cachyos.yml --ask-become-pass {{.CLI_ARGS}}
+
+  bazzite:plan:
+    desc: Preview Bazzite changes with check and diff mode
+    deps: [check-env]
+    cmds:
+      - uv run --no-sync ansible-playbook -i localhost, bazzite.yml --check --diff {{.CLI_ARGS}}
+
+  bazzite:apply:
+    desc: Install Homebrew tools and link configuration on Bazzite
+    deps: [check-env]
+    cmds:
+      - uv run --no-sync ansible-playbook -i localhost, bazzite.yml {{.CLI_ARGS}}

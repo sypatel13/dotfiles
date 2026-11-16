@@ -1,13 +1,13 @@
 ---
 - name: Create the versioned CLI directory
   ansible.builtin.file:
-    path: "{{ dotfiles_ubuntu_tools }}/{{ dotfiles_archive.name }}-{{ dotfiles_archive.version }}"
+    path: "{{ dotfiles_linux_tools }}/{{ dotfiles_archive.name }}-{{ dotfiles_archive.version }}"
     state: directory
     mode: "0755"
 
 - name: Inspect the CLI directory in check mode
   ansible.builtin.stat:
-    path: "{{ dotfiles_ubuntu_tools }}/{{ dotfiles_archive.name }}-{{ dotfiles_archive.version }}"
+    path: "{{ dotfiles_linux_tools }}/{{ dotfiles_archive.name }}-{{ dotfiles_archive.version }}"
     follow: true
     get_checksum: false
     get_mime: false
@@ -17,16 +17,16 @@
 - name: Download the verified CLI archive
   ansible.builtin.get_url:
     url: "{{ dotfiles_archive.url }}"
-    dest: "{{ dotfiles_ubuntu_cache }}/{{ dotfiles_archive.name }}-{{ dotfiles_archive.version }}.tar.gz"
-    checksum: "{{ dotfiles_archive.checksums[dotfiles_ubuntu_architecture] }}"
+    dest: "{{ dotfiles_linux_cache }}/{{ dotfiles_archive.name }}-{{ dotfiles_archive.version }}.tar.gz"
+    checksum: "{{ dotfiles_archive.checksums[dotfiles_linux_architecture] }}"
     mode: "0600"
   register: dotfiles_cli_download
   when: not ansible_check_mode or dotfiles_download_cache.stat.exists
 
 - name: Extract the CLI executable
   ansible.builtin.unarchive:
-    src: "{{ dotfiles_ubuntu_cache }}/{{ dotfiles_archive.name }}-{{ dotfiles_archive.version }}.tar.gz"
-    dest: "{{ dotfiles_ubuntu_tools }}/{{ dotfiles_archive.name }}-{{ dotfiles_archive.version }}"
+    src: "{{ dotfiles_linux_cache }}/{{ dotfiles_archive.name }}-{{ dotfiles_archive.version }}.tar.gz"
+    dest: "{{ dotfiles_linux_tools }}/{{ dotfiles_archive.name }}-{{ dotfiles_archive.version }}"
     remote_src: true
     include:
       - "{{ dotfiles_archive.name }}"
@@ -41,5 +41,5 @@
   ansible.builtin.include_tasks: symlink.yml
   vars:
     dotfiles_link:
-      src: "{{ dotfiles_ubuntu_tools }}/{{ dotfiles_archive.name }}-{{ dotfiles_archive.version }}/{{ dotfiles_archive.name }}"
+      src: "{{ dotfiles_linux_tools }}/{{ dotfiles_archive.name }}-{{ dotfiles_archive.version }}/{{ dotfiles_archive.name }}"
       dest: "{{ dotfiles_home }}/.local/bin/{{ dotfiles_archive.name }}"

@@ -22,9 +22,12 @@ Task commands in [README.md](README.md), not the snapshot installation commands
 below, to set up this automation project.
 
 [ubuntu.yml](ubuntu.yml) provides the Ubuntu 26.04 equivalent using APT and
-pinned upstream releases. See [Ubuntu setup](README.md#ubuntu-setup) for its
-package sources, bootstrap, and platform differences. The inventory below
-remains a snapshot of the Mac, not an Ubuntu package list.
+pinned upstream releases. [cachyos.yml](cachyos.yml) uses CachyOS pacman
+packages, and [bazzite.yml](bazzite.yml) uses Homebrew on Bazzite. See
+[Ubuntu setup](README.md#ubuntu-setup), [CachyOS setup](README.md#cachyos-setup),
+and [Bazzite setup](README.md#bazzite-setup) for their package sources,
+bootstrap, and platform differences. The inventory below remains a snapshot
+of the Mac, not a Linux package list.
 
 The inventory below describes the Mac at snapshot time. The repository
 configuration now includes the portability changes described in
@@ -257,9 +260,11 @@ Install the Homebrew tools above and Ghostty first. Restore Oh My Zsh at
 and the Deja integration at `~/.oh-my-zsh/custom/plugins/deja`. These
 frameworks and plugins are not included in the config snapshots.
 
-On macOS, the repository Zsh config uses Homebrew's mise and syntax-highlighting
-paths. On Ubuntu, it uses `/usr/bin/mise` and `/usr/share/zsh-syntax-highlighting`,
-adds `~/.local/bin` to PATH, and omits the macOS plugin. Neither setup needs the
+On macOS and Bazzite, the repository Zsh config uses Homebrew's mise and
+syntax-highlighting paths. On Ubuntu and CachyOS, it uses `/usr/bin/mise` and
+the distribution's syntax-highlighting path. On Linux, it adds `~/.local/bin`
+to PATH, sets `SHELL` to Zsh for tmux when the login shell differs, and omits
+the macOS plugin. No setup needs the
 standalone mise executable. Install the font described above before using the
 Ghostty config.
 

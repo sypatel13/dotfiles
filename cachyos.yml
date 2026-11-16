@@ -1,0 +1,144 @@
+---
+- name: Set up CachyOS CLI tools and terminal configuration
+  hosts: localhost
+  connection: local
+  become: false
+  gather_facts: true
+  gather_subset:
+    - "!all"
+    - min
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+  vars_files:
+    - vars.yml
+    - vars.linux.yml
+    - vars.cachyos.yml
+
+  pre_tasks:
+    # Ansible reports CachyOS as Archlinux, so match the os-release ID instead.
+    - name: Read the operating system identity
+      ansible.builtin.slurp:
+        src: /etc/os-release
+      register: dotfiles_os_release
+
+    - name: Require the pinned Ansible version and a non-root CachyOS user
+      ansible.builtin.assert:
+        that:
+          - ansible_version.full == '2.22.0'
+          - ansible_facts['system'] == 'Linux'
+          - dotfiles_os_id == 'cachyos'
+          - ansible_facts['architecture'] == 'x86_64'
+          - ansible_facts['user_uid'] != 0
+          - dotfiles_home.startswith('/')
+          - dotfiles_home != '/'
+          - playbook_dir != dotfiles_home
+        fail_msg: >-
+          Run with the pinned virtual environment as your normal CachyOS x86_64
+          user, without sudo or --become. Only the package and Docker tasks
+          request sudo. Keep this repository in its own directory.
+      vars:
+        dotfiles_os_id: >-
+          {{ (dotfiles_os_release.content | b64decode).splitlines()
+             | select('match', 'ID=') | map('regex_replace', '^ID=|"', '')
+             | first | default('') }}
+
+    - name: Require the Oh my tmux! submodule
+      ansible.builtin.assert:
+        that:
+          - (playbook_dir ~ '/vendor/oh-my-tmux/.tmux.conf') is file
+        fail_msg: Run `mise exec -- task setup` to check out the Oh my tmux! submodule.
+
+  tasks:
+    - name: Explain prerequisite-dependent checks
+      ansible.builtin.debug:
+        msg: >-
+          Check mode does not create prerequisite directories or download files.
+          Downloads are deferred when their destination directory is missing.
+          Extraction is deferred when its directory is missing or its download
+          is deferred or would change. npm package checks are deferred when
+          /usr/bin/npm is missing. Docker service and group checks are deferred
+          until the Docker package is installed. Run cachyos:apply to create
+          these prerequisites.
+      when: ansible_check_mode
+
+    - name: Install system packages and enable Docker
+      become: true
+      block:
+        # Refreshing the sync databases without a full upgrade is an unsupported partial upgrade.
+        - name: Install CachyOS packages from the current sync databases without upgrading
+          community.general.pacman:
+            name: "{{ dotfiles_cachyos_packages }}"
+            state: present
+            update_cache: false
+
+        - name: Inspect the Docker service unit in check mode
+          ansible.builtin.stat:
+            path: /usr/lib/systemd/system/docker.service
+            follow: true
+            get_checksum: false
+            get_mime: false
+          register: dotfiles_docker_unit
+          when: ansible_check_mode
+
+        - name: Enable and start the Docker daemon
+          ansible.builtin.systemd_service:
+            name: docker.service
+            enabled: true
+            state: started
+          when: not ansible_check_mode or dotfiles_docker_unit.stat.exists
+
+        - name: Add the current user to the docker group
+          ansible.builtin.user:
+            name: "{{ ansible_facts['user_id'] }}"
+            groups: docker
+            append: true
+          when: not ansible_check_mode or dotfiles_docker_unit.stat.exists
+
+    - name: Create the private download cache
+      ansible.builtin.file:
+        path: "{{ dotfiles_linux_cache }}"
+        state: directory
+        mode: "0700"
+
+    - name: Inspect the download cache in check mode
+      ansible.builtin.stat:
+        path: "{{ dotfiles_linux_cache }}"
+        follow: true
+        get_checksum: false
+        get_mime: false
+      register: dotfiles_download_cache
+      when: ansible_check_mode
+
+    - name: Install pinned user-local CLI archives
+      ansible.builtin.include_tasks: tasks/linux-cli-archive.yml
+      loop: "{{ dotfiles_cachyos_archives }}"
+      loop_control:
+        loop_var: dotfiles_archive
+        label: "{{ dotfiles_archive.name }}"
+
+    - name: Install pinned npm CLIs
+      ansible.builtin.import_tasks: tasks/linux-npm-clis.yml
+      vars:
+        dotfiles_npm_packages: "{{ dotfiles_cachyos_npm_packages }}"
+
+    # Arch installs Task as go-task to avoid a conflict with Taskwarrior.
+    - name: Link go-task as task without discarding an existing user-local command
+      ansible.builtin.include_tasks: tasks/symlink.yml
+      vars:
+        dotfiles_link:
+          src: /usr/bin/go-task
+          dest: "{{ dotfiles_home }}/.local/bin/task"
+
+    - name: Configure the shared terminal environment
+      ansible.builtin.import_tasks: tasks/terminal.yml
+      vars:
+        dotfiles_git_bin_dir: /usr/bin
+
+    - name: Explain the remaining interactive setup
+      ansible.builtin.debug:
+        msg:
+          - Start Zsh with zsh, or change your login shell yourself with chsh -s /usr/bin/zsh.
+          - "Backups of displaced files are under {{ dotfiles_backup_dir }}."
+          - Log out and back in before using Docker without sudo. The docker group grants root-equivalent access.
+          - Authenticate gh and copilot yourself. Deja history import is optional and is not automated.
+          - Ghostty and other desktop applications are not installed.

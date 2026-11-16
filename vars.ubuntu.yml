@@ -1,8 +1,4 @@
 ---
-dotfiles_ubuntu_architecture: "{{ {'x86_64': 'amd64', 'aarch64': 'arm64'}[ansible_facts['architecture']] }}"
-dotfiles_ubuntu_cache: "{{ dotfiles_home }}/.cache/dotfiles"
-dotfiles_ubuntu_tools: "{{ dotfiles_home }}/.local/share/dotfiles"
-
 dotfiles_ubuntu_packages:
   - build-essential
   - ca-certificates
@@ -29,20 +25,13 @@ dotfiles_ubuntu_packages:
   - zsh
   - zsh-syntax-highlighting
 
-dotfiles_ubuntu_deja_version: "0.4.2"
 dotfiles_ubuntu_task_version: "3.54.0"
 dotfiles_ubuntu_archives:
-  - name: deja
-    version: "{{ dotfiles_ubuntu_deja_version }}"
-    url: >-
-      https://github.com/Giammarco-Ferranti/deja/releases/download/v{{ dotfiles_ubuntu_deja_version }}/deja_{{ dotfiles_ubuntu_deja_version }}_linux_{{ dotfiles_ubuntu_architecture }}.tar.gz
-    checksums:
-      amd64: "sha256:32db767e728d447941a70cf7dc95376a1e0a96168ad79674593715ac165ed310"
-      arm64: "sha256:2473d3fb0a82bb9e03f47b6817960e7b5b499f8904676104956c979b88f657f7"
+  - "{{ dotfiles_linux_deja_archive }}"
   - name: task
     version: "{{ dotfiles_ubuntu_task_version }}"
     url: >-
-      https://github.com/go-task/task/releases/download/v{{ dotfiles_ubuntu_task_version }}/task_linux_{{ dotfiles_ubuntu_architecture }}.tar.gz
+      https://github.com/go-task/task/releases/download/v{{ dotfiles_ubuntu_task_version }}/task_linux_{{ dotfiles_linux_architecture }}.tar.gz
     checksums:
       amd64: "sha256:680859dbb4d881a9c72d4d9a8f510825450849af8567deacd7302c01124416fb"
       arm64: "sha256:d7189d439d4a6058e39e1b2acd7c8b27acd4856691b408f23b242e4294e1df5b"
@@ -56,9 +45,7 @@ dotfiles_ubuntu_npm_packages:
   - package: "@github/copilot"
     command: copilot
     version: "1.0.105"
-  - package: "@fission-ai/openspec"
-    command: openspec
-    version: "1.16.0"
+  - "{{ dotfiles_linux_openspec_package }}"
 
 dotfiles_ubuntu_font_version: "3.4.0"
 dotfiles_ubuntu_font_checksum: "sha256:d52d97b66c4c5d6d9d99c88df55148faf39738f244485026f22f8e47407744f4"

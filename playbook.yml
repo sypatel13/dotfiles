@@ -61,34 +61,12 @@
       check_mode: false
 
   tasks:
-    - name: Install CLI packages
-      environment:
-        HOMEBREW_NO_AUTO_UPDATE: "1"
-        HOMEBREW_NO_ANALYTICS: "1"
-        HOMEBREW_NO_INSTALL_CLEANUP: "1"
-      block:
-        - name: Tap and trust the Task repository
-          community.general.homebrew_tap:
-            name: go-task/tap
-            state: present
-            trust: true
-            path: "{{ dotfiles_homebrew_prefix }}/bin"
-
-        - name: Install Homebrew formulae without upgrading existing packages
-          community.general.homebrew:
-            name: "{{ dotfiles_formulae }}"
-            state: present
-            update_homebrew: false
-            path: "{{ dotfiles_homebrew_prefix }}/bin"
-
-        - name: Install CLI casks and adopt matching terminal fonts
-          community.general.homebrew_cask:
-            name: "{{ item }}"
-            state: present
-            update_homebrew: false
-            path: "{{ dotfiles_homebrew_prefix }}/bin"
-            install_options: "{{ ['adopt'] if item == 'font-sauce-code-pro-nerd-font' else [] }}"
-          loop: "{{ dotfiles_casks }}"
+    - name: Install Homebrew CLI packages and link Docker plugins
+      ansible.builtin.import_tasks: tasks/homebrew.yml
+      vars:
+        dotfiles_homebrew_taps: "{{ dotfiles_taps }}"
+        dotfiles_homebrew_formulae: "{{ dotfiles_formulae }}"
+        dotfiles_homebrew_casks: "{{ dotfiles_casks }}"
 
     - name: Configure the shared terminal environment
       ansible.builtin.import_tasks: tasks/terminal.yml
@@ -101,24 +79,6 @@
         dotfiles_link:
           src: "{{ playbook_dir }}/.config/ghostty/config.ghostty"
           dest: "{{ dotfiles_home }}/Library/Application Support/com.mitchellh.ghostty/config.ghostty"
-
-    - name: Create the private Docker configuration directory
-      ansible.builtin.file:
-        path: "{{ dotfiles_home }}/.docker"
-        state: directory
-        mode: "0700"
-
-    - name: Make standalone Docker plugins discoverable without changing credentials
-      ansible.builtin.include_tasks: tasks/symlink.yml
-      vars:
-        dotfiles_link:
-          src: "{{ dotfiles_homebrew_prefix }}/lib/docker/cli-plugins/docker-{{ dotfiles_docker_plugin }}"
-          dest: "{{ dotfiles_home }}/.docker/cli-plugins/docker-{{ dotfiles_docker_plugin }}"
-      loop:
-        - compose
-        - buildx
-      loop_control:
-        loop_var: dotfiles_docker_plugin
 
     - name: Explain the remaining interactive setup
       ansible.builtin.debug:

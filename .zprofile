@@ -11,7 +11,17 @@ if [[ "$OSTYPE" == darwin* ]]; then
     return 1
   fi
 else
+  # Bazzite provides CLI tools through Homebrew on Linux.
+  if [[ -z "${HOMEBREW_PREFIX:-}" && -x /home/linuxbrew/.linuxbrew/bin/brew ]]; then
+    eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv zsh)"
+  fi
+
   typeset -U path PATH
   path=("$HOME/.local/bin" $path)
   export PATH
+
+  # tmux starts $SHELL, which stays the login shell when a terminal profile launches Zsh.
+  if [[ "${SHELL:t}" != zsh && -n "${commands[zsh]:-}" ]]; then
+    export SHELL="${commands[zsh]}"
+  fi
 fi

@@ -24,6 +24,9 @@ dotfiles_formulae:
   - docker-buildx
   - kubernetes-cli
 
+dotfiles_taps:
+  - go-task/tap
+
 dotfiles_casks:
   - copilot-cli
   - go-task/tap/go-task

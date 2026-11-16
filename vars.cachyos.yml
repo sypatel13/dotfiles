@@ -1,0 +1,38 @@
+---
+# Packages come from the CachyOS and Arch repositories configured in /etc/pacman.conf.
+dotfiles_cachyos_packages:
+  - base-devel
+  - ca-certificates
+  - curl
+  - docker
+  - docker-buildx
+  - docker-compose
+  - eza
+  - fontconfig
+  - fzf
+  - git
+  - git-delta
+  - github-cli
+  - github-copilot-cli
+  - go-task
+  - jq
+  - kubectl
+  - mise
+  - nodejs
+  - npm
+  - openssl
+  - python
+  - ripgrep
+  - sqlite
+  - tmux
+  - ttf-sourcecodepro-nerd
+  - vim
+  - zsh
+  - zsh-syntax-highlighting
+
+# Deja and OpenSpec are not packaged in the CachyOS or Arch repositories.
+dotfiles_cachyos_archives:
+  - "{{ dotfiles_linux_deja_archive }}"
+
+dotfiles_cachyos_npm_packages:
+  - "{{ dotfiles_linux_openspec_package }}"

@@ -1,0 +1,89 @@
+---
+- name: Set up Bazzite CLI tools and terminal configuration
+  hosts: localhost
+  connection: local
+  become: false
+  gather_facts: true
+  gather_subset:
+    - "!all"
+    - min
+  vars:
+    ansible_python_interpreter: "{{ ansible_playbook_python }}"
+  vars_files:
+    - vars.yml
+    - vars.bazzite.yml
+
+  pre_tasks:
+    - name: Read the operating system identity
+      ansible.builtin.slurp:
+        src: /etc/os-release
+      register: dotfiles_os_release
+
+    - name: Require the pinned Ansible version and a non-root Bazzite user
+      ansible.builtin.assert:
+        that:
+          - ansible_version.full == '2.22.0'
+          - ansible_facts['system'] == 'Linux'
+          - dotfiles_os_id == 'bazzite'
+          - ansible_facts['architecture'] == 'x86_64'
+          - ansible_facts['user_uid'] != 0
+          - dotfiles_home.startswith('/')
+          - dotfiles_home != '/'
+          - playbook_dir != dotfiles_home
+        fail_msg: >-
+          Run with the pinned virtual environment as your normal Bazzite x86_64
+          user, without sudo or --become. Keep this repository in its own directory.
+      vars:
+        dotfiles_os_id: >-
+          {{ (dotfiles_os_release.content | b64decode).splitlines()
+             | select('match', 'ID=') | map('regex_replace', '^ID=|"', '')
+             | first | default('') }}
+
+    - name: Require the Oh my tmux! submodule
+      ansible.builtin.assert:
+        that:
+          - (playbook_dir ~ '/vendor/oh-my-tmux/.tmux.conf') is file
+        fail_msg: Run `mise exec -- task setup` to check out the Oh my tmux! submodule.
+
+    - name: Inspect the Homebrew executable
+      ansible.builtin.stat:
+        path: "{{ dotfiles_homebrew_prefix }}/bin/brew"
+        follow: true
+        get_checksum: false
+        get_mime: false
+      register: dotfiles_brew
+
+    - name: Require Homebrew before installing packages
+      ansible.builtin.assert:
+        that:
+          - dotfiles_brew.stat.exists
+          - dotfiles_brew.stat.executable | default(false)
+        fail_msg: >-
+          Bazzite normally provides Homebrew at {{ dotfiles_homebrew_prefix }}.
+          Install current Homebrew from https://brew.sh there before running
+          this playbook.
+
+  tasks:
+    - name: Install Homebrew CLI packages and link Docker plugins
+      ansible.builtin.import_tasks: tasks/homebrew.yml
+      vars:
+        dotfiles_homebrew_taps: "{{ dotfiles_bazzite_taps }}"
+        dotfiles_homebrew_formulae: "{{ dotfiles_bazzite_formulae }}"
+        dotfiles_homebrew_casks: "{{ dotfiles_bazzite_casks }}"
+
+    - name: Configure the shared terminal environment
+      ansible.builtin.import_tasks: tasks/terminal.yml
+      vars:
+        dotfiles_git_bin_dir: "{{ dotfiles_homebrew_prefix }}/bin"
+
+    - name: Explain the remaining interactive setup
+      ansible.builtin.debug:
+        msg:
+          - >-
+            Set your terminal profile's custom command to
+            {{ dotfiles_homebrew_prefix }}/bin/zsh. Bazzite recommends this
+            instead of changing your login shell.
+          - "Backups of displaced files are under {{ dotfiles_backup_dir }}."
+          - Docker clients need an existing local or remote daemon; none is installed or enabled here.
+          - Authenticate gh and copilot yourself. Deja history import is optional and is not automated.
+          - Ghostty and other desktop applications are not installed.

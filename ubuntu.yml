@@ -11,6 +11,7 @@
     ansible_python_interpreter: /usr/bin/python3
   vars_files:
     - vars.yml
+    - vars.linux.yml
     - vars.ubuntu.yml
 
   pre_tasks:
@@ -109,7 +110,7 @@
               URIs: https://download.docker.com/linux/ubuntu
               Suites: resolute
               Components: stable
-              Architectures: {{ dotfiles_ubuntu_architecture }}
+              Architectures: {{ dotfiles_linux_architecture }}
               Signed-By: /etc/apt/keyrings/docker.asc
             mode: "0644"
             backup: true
@@ -150,13 +151,13 @@
 
     - name: Create the private download cache
       ansible.builtin.file:
-        path: "{{ dotfiles_ubuntu_cache }}"
+        path: "{{ dotfiles_linux_cache }}"
         state: directory
         mode: "0700"
 
     - name: Inspect the download cache in check mode
       ansible.builtin.stat:
-        path: "{{ dotfiles_ubuntu_cache }}"
+        path: "{{ dotfiles_linux_cache }}"
         follow: true
         get_checksum: false
         get_mime: false
@@ -164,7 +165,7 @@
       when: ansible_check_mode
 
     - name: Install pinned user-local CLI archives
-      ansible.builtin.include_tasks: tasks/ubuntu-cli-archive.yml
+      ansible.builtin.include_tasks: tasks/linux-cli-archive.yml
       loop: "{{ dotfiles_ubuntu_archives }}"
       loop_control:
         loop_var: dotfiles_archive
@@ -172,13 +173,13 @@
 
     - name: Create the pinned kubectl directory
       ansible.builtin.file:
-        path: "{{ dotfiles_ubuntu_tools }}/kubectl-{{ dotfiles_ubuntu_kubectl_version }}"
+        path: "{{ dotfiles_linux_tools }}/kubectl-{{ dotfiles_ubuntu_kubectl_version }}"
         state: directory
         mode: "0755"
 
     - name: Inspect the kubectl directory in check mode
       ansible.builtin.stat:
-        path: "{{ dotfiles_ubuntu_tools }}/kubectl-{{ dotfiles_ubuntu_kubectl_version }}"
+        path: "{{ dotfiles_linux_tools }}/kubectl-{{ dotfiles_ubuntu_kubectl_version }}"
         follow: true
         get_checksum: false
         get_mime: false
@@ -188,9 +189,9 @@
     - name: Install the verified kubectl binary
       ansible.builtin.get_url:
         url: >-
-          https://dl.k8s.io/release/v{{ dotfiles_ubuntu_kubectl_version }}/bin/linux/{{ dotfiles_ubuntu_architecture }}/kubectl
-        dest: "{{ dotfiles_ubuntu_tools }}/kubectl-{{ dotfiles_ubuntu_kubectl_version }}/kubectl"
-        checksum: "{{ dotfiles_ubuntu_kubectl_checksums[dotfiles_ubuntu_architecture] }}"
+          https://dl.k8s.io/release/v{{ dotfiles_ubuntu_kubectl_version }}/bin/linux/{{ dotfiles_linux_architecture }}/kubectl
+        dest: "{{ dotfiles_linux_tools }}/kubectl-{{ dotfiles_ubuntu_kubectl_version }}/kubectl"
+        checksum: "{{ dotfiles_ubuntu_kubectl_checksums[dotfiles_linux_architecture] }}"
         mode: "0755"
       when: not ansible_check_mode or dotfiles_kubectl_directory.stat.exists
 
@@ -198,47 +199,18 @@
       ansible.builtin.include_tasks: tasks/symlink.yml
       vars:
         dotfiles_link:
-          src: "{{ dotfiles_ubuntu_tools }}/kubectl-{{ dotfiles_ubuntu_kubectl_version }}/kubectl"
+          src: "{{ dotfiles_linux_tools }}/kubectl-{{ dotfiles_ubuntu_kubectl_version }}/kubectl"
           dest: "{{ dotfiles_home }}/.local/bin/kubectl"
 
-    - name: Inspect the system npm executable in check mode
-      ansible.builtin.stat:
-        path: /usr/bin/npm
-        follow: true
-        get_checksum: false
-        get_mime: false
-      register: dotfiles_ubuntu_npm
-      when: ansible_check_mode
-
-    - name: Install pinned npm CLIs in a dedicated user-owned prefix
-      community.general.npm:
-        name: "{{ item.package }}"
-        version: "{{ item.version }}"
-        global: true
-        state: present
-        executable: /usr/bin/npm
-      loop: "{{ dotfiles_ubuntu_npm_packages }}"
-      loop_control:
-        label: "{{ item.package }}"
-      environment:
-        PATH: /usr/bin:/bin
-        npm_config_prefix: "{{ dotfiles_ubuntu_tools }}/npm"
-      when: not ansible_check_mode or dotfiles_ubuntu_npm.stat.exists
-
-    - name: Link npm CLIs without discarding existing user-local commands
-      ansible.builtin.include_tasks: tasks/symlink.yml
+    - name: Install pinned npm CLIs
+      ansible.builtin.import_tasks: tasks/linux-npm-clis.yml
       vars:
-        dotfiles_link:
-          src: "{{ dotfiles_ubuntu_tools }}/npm/bin/{{ dotfiles_npm_package.command }}"
-          dest: "{{ dotfiles_home }}/.local/bin/{{ dotfiles_npm_package.command }}"
-      loop: "{{ dotfiles_ubuntu_npm_packages }}"
-      loop_control:
-        loop_var: dotfiles_npm_package
+        dotfiles_npm_packages: "{{ dotfiles_ubuntu_npm_packages }}"
 
     - name: Download the verified SauceCodePro Nerd Font archive
       ansible.builtin.get_url:
         url: "https://github.com/ryanoasis/nerd-fonts/releases/download/v{{ dotfiles_ubuntu_font_version }}/SourceCodePro.tar.xz"
-        dest: "{{ dotfiles_ubuntu_cache }}/SourceCodePro-{{ dotfiles_ubuntu_font_version }}.tar.xz"
+        dest: "{{ dotfiles_linux_cache }}/SourceCodePro-{{ dotfiles_ubuntu_font_version }}.tar.xz"
         checksum: "{{ dotfiles_ubuntu_font_checksum }}"
         mode: "0600"
       register: dotfiles_font_download
@@ -261,7 +233,7 @@
 
     - name: Install SauceCodePro Nerd Font for the current user
       ansible.builtin.unarchive:
-        src: "{{ dotfiles_ubuntu_cache }}/SourceCodePro-{{ dotfiles_ubuntu_font_version }}.tar.xz"
+        src: "{{ dotfiles_linux_cache }}/SourceCodePro-{{ dotfiles_ubuntu_font_version }}.tar.xz"
         dest: "{{ dotfiles_ubuntu_font_dir }}"
         remote_src: true
         mode: "u=rwX,go=rX"

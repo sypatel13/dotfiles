@@ -1,0 +1,9 @@
+---
+dotfiles_homebrew_prefix: /home/linuxbrew/.linuxbrew
+
+# The go-task tap cask runs a macOS-only postflight, so use homebrew-core's formula on Linux.
+dotfiles_bazzite_taps: []
+dotfiles_bazzite_formulae: "{{ dotfiles_formulae + ['go-task'] }}"
+dotfiles_bazzite_casks:
+  - copilot-cli
+  - font-sauce-code-pro-nerd-font

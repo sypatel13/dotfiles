@@ -1,0 +1,20 @@
+---
+# User-local CLI installs shared by the Ubuntu and CachyOS playbooks.
+dotfiles_linux_architecture: "{{ {'x86_64': 'amd64', 'aarch64': 'arm64'}[ansible_facts['architecture']] }}"
+dotfiles_linux_cache: "{{ dotfiles_home }}/.cache/dotfiles"
+dotfiles_linux_tools: "{{ dotfiles_home }}/.local/share/dotfiles"
+
+dotfiles_linux_deja_version: "0.4.2"
+dotfiles_linux_deja_archive:
+  name: deja
+  version: "{{ dotfiles_linux_deja_version }}"
+  url: >-
+    https://github.com/Giammarco-Ferranti/deja/releases/download/v{{ dotfiles_linux_deja_version }}/deja_{{ dotfiles_linux_deja_version }}_linux_{{ dotfiles_linux_architecture }}.tar.gz
+  checksums:
+    amd64: "sha256:32db767e728d447941a70cf7dc95376a1e0a96168ad79674593715ac165ed310"
+    arm64: "sha256:2473d3fb0a82bb9e03f47b6817960e7b5b499f8904676104956c979b88f657f7"
+
+dotfiles_linux_openspec_package:
+  package: "@fission-ai/openspec"
+  command: openspec
+  version: "1.16.0"
